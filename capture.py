@@ -2,9 +2,10 @@ from scapy.all import sniff
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 from datetime import datetime
 from detectors.port_scan import PortScanDetector
-
+from detectors.syn_flood import SynFloodDetector
 
 detector = PortScanDetector()
+syn_detector = SynFloodDetector()
 
 def process_packet(packet):
     now = datetime.now().timestamp()
@@ -19,6 +20,11 @@ def process_packet(packet):
             tdst_p = packet[TCP].dport
             if detector.check(src_ip, tdst_p, now):
                 print(f"[ALERT] Port scan detected from {src_ip}")
+                
+            if packet[TCP].flags == "S":
+                if syn_detector.check(src_ip, now):
+                    print(f"[ALERT] SYN flood detected from {src_ip}")
+            
             print(f"[{rntime}] TCP | {src_ip}:{tsrc_p} -> {dst_ip}:{tdst_p}")
             
         elif packet.haslayer(UDP):
