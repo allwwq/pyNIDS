@@ -5,6 +5,7 @@ from detectors.port_scan import PortScanDetector
 from detectors.syn_flood import SynFloodDetector
 from detectors.icmp_flood import ICMPfloodDetector
 from config import load_config
+from alerts import log_packet, log_icmp, log_alert
 
 config = load_config("config.yaml")
 detector = PortScanDetector(config["detectors"]["port_scan"])
@@ -23,22 +24,22 @@ def process_packet(packet):
             tsrc_p = packet[TCP].sport
             tdst_p = packet[TCP].dport
             if detector.check(src_ip, tdst_p, now):
-                print(f"[ALERT] Port scan detected from {src_ip}")
+                log_alert("PORT SCAN", src_ip)
                 
             if packet[TCP].flags == "S":
                 if syn_detector.check(src_ip, now):
-                    print(f"[ALERT] SYN flood detected from {src_ip}")
+                    log_alert("SYN FLOOD", src_ip)
             
-            print(f"[{rntime}] TCP | {src_ip}:{tsrc_p} -> {dst_ip}:{tdst_p}")
+            log_packet(rntime, "TCP", src_ip, tsrc_p, dst_ip, tdst_p)
             
         elif packet.haslayer(UDP):
             usrc_p = packet[UDP].sport
             udst_p = packet[UDP].dport
-            print(f"[{rntime}] UDP | {src_ip}:{usrc_p} -> {dst_ip}:{udst_p}")
+            log_packet(rntime, "UDP", src_ip, usrc_p, dst_ip, udst_p)
             
         elif packet.haslayer(ICMP):
             if icmp_detector.check(src_ip, now):
-                print(f"[ALERT] ICMP flood detected from {src_ip}")
-            print(f"[{rntime}] ICMP | {src_ip} -> {dst_ip}")
+                log_alert("ICMP FLOOD", src_ip)
+            log_icmp(rntime, src_ip, dst_ip)
 
 sniff(iface="eth0", filter="tcp or udp or icmp", prn=process_packet, store=False)
