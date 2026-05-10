@@ -9,11 +9,12 @@ from config import load_config
 from alerts import log_packet, log_icmp, log_alert
 
 parser = argparse.ArgumentParser(description="pyNIDS")
-parser.add_argument("--iface", default="eth0", help="Network interface to sniff on")
+parser.add_argument("--iface", default=None, help="Network interface to sniff on")
 parser.add_argument("--config", default="config.yaml", help="Path to config file")
 args = parser.parse_args()
 
 config = load_config(args.config)
+iface = args.iface if args.iface is not None else config["network"]["iface"]
 detector = PortScanDetector(config["detectors"]["port_scan"])
 syn_detector = SynFloodDetector(config["detectors"]["syn_flood"])
 icmp_detector = ICMPfloodDetector(config["detectors"]["icmp_flood"])
@@ -48,4 +49,4 @@ def process_packet(packet):
                 log_alert("ICMP FLOOD", src_ip)
             log_icmp(rntime, src_ip, dst_ip)
 
-sniff(iface=args.iface, filter="tcp or udp or icmp", prn=process_packet, store=False)
+sniff(iface=iface, filter="tcp or udp or icmp", prn=process_packet, store=False)
