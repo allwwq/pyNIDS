@@ -4,10 +4,12 @@ from datetime import datetime
 from detectors.port_scan import PortScanDetector
 from detectors.syn_flood import SynFloodDetector
 from detectors.icmp_flood import ICMPfloodDetector
+from config import load_config
 
-detector = PortScanDetector()
-syn_detector = SynFloodDetector()
-icmp_detector = ICMPfloodDetector()
+config = load_config("config.yaml")
+detector = PortScanDetector(config["detectors"]["port_scan"])
+syn_detector = SynFloodDetector(config["detectors"]["syn_flood"])
+icmp_detector = ICMPfloodDetector(config["detectors"]["icmp_flood"])
 
 def process_packet(packet):
     now = datetime.now().timestamp()

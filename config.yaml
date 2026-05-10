@@ -1,0 +1,13 @@
+network:
+  iface: eth0
+
+detectors:
+  port_scan:
+    max_threshold: 15
+    time_window: 10
+  syn_flood:
+    max_threshold: 100
+    time_window: 10
+  icmp_flood:
+    max_threshold: 100
+    time_window: 10
