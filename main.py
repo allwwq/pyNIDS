@@ -9,8 +9,8 @@ from config import load_config
 from alerts import log_packet, log_icmp, log_alert
 
 parser = argparse.ArgumentParser(description="pyNIDS")
-parser.add_argument("--iface", default=None, help="Network interface to sniff on")
-parser.add_argument("--config", default="config.yaml", help="Path to config file")
+parser.add_argument("--iface", default=None, help="Network interface to sniff on (default: from config.yaml)")
+parser.add_argument("--config", default="config.yaml", help="Path to config file (default: config.yaml)")
 args = parser.parse_args()
 
 config = load_config(args.config)
