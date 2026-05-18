@@ -1,12 +1,14 @@
 import argparse
 from scapy.all import sniff
 from scapy.layers.inet import IP, TCP, UDP, ICMP
+from scapy.layers.l2 import ARP
 from datetime import datetime
 from detectors.port_scan import PortScanDetector
 from detectors.syn_flood import SynFloodDetector
 from detectors.icmp_flood import ICMPfloodDetector
 from config import load_config
-from alerts import log_packet, log_icmp, log_alert
+from alerts import log_packet, log_icmp, log_alert, log_arp
+from detectors.arp_spoof import ArpSpoofDetector
 
 parser = argparse.ArgumentParser(description="pyNIDS")
 parser.add_argument("--iface", default=None, help="Network interface to sniff on (default: from config.yaml)")
@@ -18,12 +20,21 @@ iface = args.iface if args.iface is not None else config["network"]["iface"]
 detector = PortScanDetector(config["detectors"]["port_scan"])
 syn_detector = SynFloodDetector(config["detectors"]["syn_flood"])
 icmp_detector = ICMPfloodDetector(config["detectors"]["icmp_flood"])
+arp_detector = ArpSpoofDetector() if config["detectors"]["arp_spoof"]["enabled"] else None
 
 def process_packet(packet):
     now = datetime.now().timestamp()
     rntime = datetime.now().strftime("%H:%M:%S")
     
-    if IP in packet:
+    if ARP in packet and arp_detector:
+        src_ip = packet[ARP].psrc
+        src_mac = packet[ARP].hwsrc
+        dst_ip = packet[ARP].pdst
+        if arp_detector.check(src_ip, src_mac):
+            log_alert("ARP SPOOFING", src_ip, "HIGH", rntime, now)
+        log_arp(rntime, src_ip, src_mac, dst_ip)
+    
+    elif IP in packet:
         src_ip = packet[IP].src
         dst_ip = packet[IP].dst
     
@@ -31,11 +42,11 @@ def process_packet(packet):
             tsrc_p = packet[TCP].sport
             tdst_p = packet[TCP].dport
             if detector.check(src_ip, tdst_p, now):
-                log_alert("PORT SCAN", src_ip)
+                log_alert("PORT SCAN", src_ip, "HIGH", rntime, now)
                 
             if packet[TCP].flags == "S":
                 if syn_detector.check(src_ip, now):
-                    log_alert("SYN FLOOD", src_ip)
+                    log_alert("SYN FLOOD", src_ip, "CRITICAL", rntime, now)
             
             log_packet(rntime, "TCP", src_ip, tsrc_p, dst_ip, tdst_p)
             
@@ -46,7 +57,7 @@ def process_packet(packet):
             
         elif packet.haslayer(ICMP):
             if icmp_detector.check(src_ip, now):
-                log_alert("ICMP FLOOD", src_ip)
+                log_alert("ICMP FLOOD", src_ip, "CRITICAL", rntime, now)
             log_icmp(rntime, src_ip, dst_ip)
 
-sniff(iface=iface, filter="tcp or udp or icmp", prn=process_packet, store=False)
+sniff(iface=iface, filter="tcp or udp or icmp or arp", prn=process_packet, store=False)

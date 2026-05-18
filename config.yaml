@@ -11,3 +11,5 @@ detectors:
   icmp_flood:
     max_threshold: 100
     time_window: 10
+  arp_spoof:
+    enabled: true
