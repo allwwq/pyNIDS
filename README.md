@@ -131,7 +131,7 @@ sudo arpspoof -i eth0 -t <target_ip> <gateway_ip>
 ### v1.x — Core Features
 
 - [x] **v1.0** — Packet capture (TCP/UDP/ICMP), port scan / SYN flood / ICMP flood detectors, YAML config, CLI
-- [ ] **v1.1** — ARP spoofing detector, alert severity (INFO/WARNING/HIGH/CRITICAL), JSON log file output
+- [x] **v1.1** — ARP spoofing detector, alert severity (INFO/WARNING/HIGH/CRITICAL), JSON log file output
 - [ ] **v1.2** — Detector plugin API — auto-loading from `detectors/`, unified detector interface
 - [ ] **v1.3** — Terminal dashboard — live stats: packets/sec, top IPs, active alerts, protocol breakdown
 - [ ] **v1.4** — Packet filters — `--port`, `--host`, `--proto` CLI flags; config profiles (`home.yaml`, `lab.yaml`)
