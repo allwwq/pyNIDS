@@ -13,6 +13,8 @@ from detectors.arp_spoof import ArpSpoofDetector
 parser = argparse.ArgumentParser(description="pyNIDS")
 parser.add_argument("--iface", default=None, help="Network interface to sniff on (default: from config.yaml)")
 parser.add_argument("--config", default="config.yaml", help="Path to config file (default: config.yaml)")
+parser.add_argument("--mode", choices=["baseline", "bpf"], default="bpf",
+                    help="baseline: no BPF filter (all packets reach Python) | bpf: kernel-level filtering (default)")
 args = parser.parse_args()
 
 config = load_config(args.config)
@@ -22,10 +24,20 @@ syn_detector = SynFloodDetector(config["detectors"]["syn_flood"])
 icmp_detector = ICMPfloodDetector(config["detectors"]["icmp_flood"])
 arp_detector = ArpSpoofDetector() if config["detectors"]["arp_spoof"]["enabled"] else None
 
+# BPF mode: kernel drops irrelevant packets before copying to Python (faster)
+# Baseline mode: no filter, all packets reach Python, Python decides what to ignore (slower)
+bpf_filter = "tcp or udp or icmp or arp" if args.mode == "bpf" else None
+
+print(f"[ * ] Mode: {args.mode.upper()} | Interface: {iface}")
+if bpf_filter:
+    print(f"[ * ] BPF filter: {bpf_filter}")
+else:
+    print(f"[ * ] BPF filter: disabled (baseline mode)")
+
 def process_packet(packet):
     now = datetime.now().timestamp()
     rntime = datetime.now().strftime("%H:%M:%S")
-    
+
     if ARP in packet and arp_detector:
         src_ip = packet[ARP].psrc
         src_mac = packet[ARP].hwsrc
@@ -33,31 +45,31 @@ def process_packet(packet):
         if arp_detector.check(src_ip, src_mac):
             log_alert("ARP SPOOFING", src_ip, "HIGH", rntime, now)
         log_arp(rntime, src_ip, src_mac, dst_ip)
-    
+
     elif IP in packet:
         src_ip = packet[IP].src
         dst_ip = packet[IP].dst
-    
+
         if packet.haslayer(TCP):
             tsrc_p = packet[TCP].sport
             tdst_p = packet[TCP].dport
             if detector.check(src_ip, tdst_p, now):
                 log_alert("PORT SCAN", src_ip, "HIGH", rntime, now)
-                
+
             if packet[TCP].flags == "S":
                 if syn_detector.check(src_ip, now):
                     log_alert("SYN FLOOD", src_ip, "CRITICAL", rntime, now)
-            
+
             log_packet(rntime, "TCP", src_ip, tsrc_p, dst_ip, tdst_p)
-            
+
         elif packet.haslayer(UDP):
             usrc_p = packet[UDP].sport
             udst_p = packet[UDP].dport
             log_packet(rntime, "UDP", src_ip, usrc_p, dst_ip, udst_p)
-            
+
         elif packet.haslayer(ICMP):
             if icmp_detector.check(src_ip, now):
                 log_alert("ICMP FLOOD", src_ip, "CRITICAL", rntime, now)
             log_icmp(rntime, src_ip, dst_ip)
 
-sniff(iface=iface, filter="tcp or udp or icmp or arp", prn=process_packet, store=False)
+sniff(iface=iface, filter=bpf_filter, prn=process_packet, store=False)
