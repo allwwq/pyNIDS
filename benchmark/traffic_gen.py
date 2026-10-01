@@ -2,7 +2,7 @@ import argparse
 import json
 import sys
 import time
-from scapy.all import conf, Ether, IP, TCP, UDP, ICMP, sendpfast
+from scapy.all import conf, Ether, IP, TCP, UDP, ICMP
 
 
 def get_default_gateway():
@@ -76,41 +76,23 @@ def main():
     print("\n[ + ] Traffic generation started. Press Ctrl+C to abort.")
     start_time = time.time()
 
-    if args.rate < 2000:
-        print("[ MODE ] Low-Rate Precision Loop")
-        send_socket = conf.L2socket(iface=args.iface)
-        packet_interval = 1.0 / args.rate
+    print("[ MODE ] Precision Loop (Python Custom Timer)")
+    send_socket = conf.L2socket(iface=args.iface)
+    packet_interval = 1.0 / args.rate
 
-        try:
-            while packets_sent < total_packets_to_send:
-                target_send_time = start_time + (packets_sent * packet_interval)
-                now = time.time()
-                if now < target_send_time:
-                    time.sleep(target_send_time - now)
+    try:
+        while packets_sent < total_packets_to_send:
+            target_send_time = start_time + (packets_sent * packet_interval)
+            now = time.time()
+            if now < target_send_time:
+                time.sleep(target_send_time - now)
 
-                send_socket.send(packet)
-                packets_sent += 1
-        except KeyboardInterrupt:
-            print("\n[ ! ] Generation interrupted by user.")
-        finally:
-            send_socket.close()
-
-    else:
-        print("[ MODE ] High-Rate Performance Mode (sendpfast / tcpreplay)")
-        try:
-            sendpfast(
-                packet,
-                pps=args.rate,
-                loop=total_packets_to_send,
-                iface=args.iface
-            )
-            packets_sent = total_packets_to_send
-        except KeyboardInterrupt:
-            print("\n[ ! ] Generation interrupted by user.")
-        except Exception as e:
-            print(f"\n[ ERROR ] sendpfast failed: {e}")
-            print("[ ! ] Ensure tcpreplay is installed: sudo apt install tcpreplay")
-            sys.exit(1)
+            send_socket.send(packet)
+            packets_sent += 1
+    except KeyboardInterrupt:
+        print("\n[ ! ] Generation interrupted by user.")
+    finally:
+        send_socket.close()
 
     actual_duration = time.time() - start_time
     actual_pps = packets_sent / actual_duration if actual_duration > 0 else 0
@@ -135,13 +117,9 @@ def main():
             "actual_duration": round(actual_duration, 3),
             "achieved_pps": round(actual_pps, 2)
         }
-        
-        if args.output:
-            import os
-            os.makedirs(os.path.dirname(args.output), exist_ok=True)
-            with open(args.output, "w") as f:
-                json.dump(results, f, indent=2)
-            print(f"[ + ] Results saved to {args.output}")
+        with open(args.output, "w") as f:
+            json.dump(results, f, indent=2)
+        print(f"[ + ] Results saved to {args.output}")
 
 
 if __name__ == "__main__":
